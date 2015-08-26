@@ -1,13 +1,49 @@
 
 #include "gk_tutorial_jni_callback_RunJNICallback.h"
 #include <stdio.h>
+#include <pthread.h>
 
-// library local
 // global pointer to gk.tutorial.jni.callback.NativeCallListener instance
 static jobject pNativeCallListenerRef = 0;
 // method descriptors for class gk.tutorial.jni.callback.NativeCallListener
 static jmethodID mOnNativeVoidCall;
 static jmethodID mOnNativeStringCall;
+
+static JavaVM * jvm;
+
+/*
+ * get current JavaVM and attach to java java thread
+ */
+JNIEnv * get_JNIEnv() {
+  JavaVMAttachArgs attachArgs;
+  attachArgs.version = JNI_VERSION_1_6; // no 1_7 version in jni.h
+  attachArgs.name = ">>>NativeThread_Any"; // java: Thread.currentThread().getName()
+  attachArgs.group = NULL;
+
+  JNIEnv * env;
+  if ( (*jvm)->AttachCurrentThread(jvm, (void**) &env, &attachArgs) != JNI_OK) {
+    env = NULL;
+  }
+
+  return env;
+}
+
+/**
+ * run this function in native pthread
+ */
+void * pthread_function(void) {
+  JNIEnv * jniEnv = get_JNIEnv();
+  jstring jStr = (*jniEnv)->NewStringUTF(jniEnv, "utf str from native!");
+  jint i, res;
+
+  for (i = 0; i<10; i++) {
+    res = (*jniEnv)->CallIntMethod(jniEnv, pNativeCallListenerRef, mOnNativeStringCall, jStr);
+  }
+
+  printf("native pthread: invokeCallbackFromNative, invocations: %d, last res: %d\n", i, res);
+
+  pthread_exit(0); // terminate pthread
+}
 
 /*
  * Class:     gk_tutorial_jni_callback_RunJNICallback
@@ -18,7 +54,8 @@ JNIEXPORT void JNICALL Java_gk_tutorial_jni_callback_RunJNICallback_registerCall
 {
   jclass cNativeCallListener;
 
-  printf("NATIVE: registerCallback begin\n");
+  // save JavaVM to use in callbacks
+  (*pEnv)->GetJavaVM(pEnv, &jvm);
 
   // take gk.tutorial.jni.callback.NativeCallListener.class object
   cNativeCallListener = (*pEnv)->GetObjectClass(pEnv, pNativeCallListener);
@@ -29,7 +66,12 @@ JNIEXPORT void JNICALL Java_gk_tutorial_jni_callback_RunJNICallback_registerCall
 
   pNativeCallListenerRef = (*pEnv)->NewGlobalRef(pEnv, pNativeCallListener);
 
-  printf("NATIVE: registerCallback end\n");
+  printf("NATIVE: registerCallback\n");
+
+  // start native thread
+  pthread_t thread_ptr_1, thread_ptr_2;
+  pthread_create(&thread_ptr_1, NULL, (void * (*) (void *)) &pthread_function, NULL);
+  pthread_create(&thread_ptr_2, NULL, (void * (*) (void *)) &pthread_function, NULL);
 }
 
 /*
@@ -47,7 +89,6 @@ JNIEXPORT void JNICALL Java_gk_tutorial_jni_callback_RunJNICallback_invokeCallba
 
   printf("invokeCallbackFromNative, res: %d\n", res);
 }
-
 
 
 
