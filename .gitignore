@@ -10,4 +10,11 @@
 
 # java classes
 bin/
+sources.list
+
+# generated c-header
+src/main/c/*.h
+
+# compiled shared library
+*.so
 
