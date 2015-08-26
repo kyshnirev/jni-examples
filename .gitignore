@@ -1,0 +1,13 @@
+
+# vim/kate
+.*.swp
+.*.kate-swp
+
+# eclipse
+.classpath
+.project
+.settings
+
+# java classes
+bin/
+
